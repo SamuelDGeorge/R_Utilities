@@ -549,6 +549,14 @@ pipelined_print_general_Error <- function(InputFilePath, OutputFileName, xaxis =
   
 }
 
+pipelined_print_bliss_scores_from_raw_growth <- function(Input_file_name = "default.csv",output_name = "Mean_Raw", data_location){
+  output_name <- paste(output_name,".csv", sep = "")
+  raw_data = import_plate_range(Input_file_name, data_location)
+  raw_data = (raw_data/raw_data[1,1])
+  bliss = bliss_calculator(raw_data)
+  write.csv(bliss, file = output_name)
+}
+
 Print_reproducibility_DM_Mean <- function(ReplicateA,ReplicateB, xlabel = "ReplicateB", ylabel = "ReplicateA", xymax  = 3, xymin = 0, export_name = "default.jpg", label_point = FALSE) {
   
   ReplicateA <- as.data.frame(read.csv(ReplicateA))
