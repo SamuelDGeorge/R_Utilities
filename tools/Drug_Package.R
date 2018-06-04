@@ -18,6 +18,9 @@ if (!require("readxl")) {
   library(readxl)
 }
 
+read_xlsx <- readxl::read_xlsx
+heatmap.2 <- gplots::heatmap.2
+
 un_craig_plate <- function(Plate) {
   rownames(Plate) = rev(as.vector(rownames(Plate)))
   colnames(Plate) = rev(as.vector(colnames(Plate)))
@@ -449,6 +452,30 @@ calculate_bliss_sum <- function(data_plate,export_name="default_heatmap.csv",xla
   return(bliss_sum)
 }
 
+calculate_bliss_sum_v2 <- function(data_plate,export_name="default_heatmap.csv",xlabel="x-Axis",ylabel="y-Axis") {
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      if (current_value < 0) {
+        data_plate[i,j] = 0
+      } else if (current_value > 2) {
+        data_plate[i,j] = 1
+      } else {
+        data_plate[i,j] = current_value - 1
+      } 
+    }
+  }
+  
+  bliss_sum = 0
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      bliss_sum = current_value + bliss_sum
+    }
+  }
+  return(bliss_sum)
+}
+
 print_heatmap_crispr <- function(data_plate,export_name="default_heatmap.jpg",xlabel="x-Axis",ylabel="y-Axis") {
   
   color_range = 500
@@ -482,6 +509,44 @@ print_heatmap_crispr <- function(data_plate,export_name="default_heatmap.jpg",xl
   
 }
 
+print_heatmap_bliss_v2 <- function(data_plate,export_name="default_heatmap.jpg",xlabel="x-Axis",ylabel="y-Axis") {
+  
+  color_range = 399
+  
+  jpeg(filename=export_name,res=600,height = 12,width = 12,units = "in")
+  
+  Synergy <- colorRampPalette(c("red","white","Blue"))(n = color_range)
+  colors_pal = sort(c(seq(-1,-0.001, length=200), seq(0,1,length=200)))
+  
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      if (current_value < 0) {
+        data_plate[i,j] = 0
+      } else if (current_value > 2) {
+        data_plate[i,j] = 1
+      } else {
+        data_plate[i,j] = current_value - 1
+      } 
+    }
+  }
+  
+  heatmap.2(data_plate, dendrogram = "none",
+            Rowv = NA, 
+            Colv = NA, 
+            xlab = xlabel, 
+            ylab = ylabel,
+            col = Synergy,
+            trace='none',
+            density.info = c("none"),
+            keysize = 1,
+            symkey = FALSE,
+            breaks = colors_pal)
+  
+  dev.off()
+  
+}
+
 pipelined_print_heatmap <- function(InputFilePath, OutputFileName) {
   OutputName = paste(OutputFileName, ".jpg",sep = "")
   print_heatmap_bliss(import_plate(InputFilePath), OutputName)
@@ -492,10 +557,29 @@ pipelined_print_heatmap <- function(InputFilePath, OutputFileName, data_location
   print_heatmap_bliss(import_plate_range(InputFilePath, data_location), OutputName)
 }
 
+pipelined_print_heatmap_v2 <- function(InputFilePath, OutputFileName, data_location) {
+  OutputName = paste(OutputFileName, ".jpg",sep = "")
+  print_heatmap_bliss_v2(import_plate_range(InputFilePath, data_location), OutputName)
+}
+
 pipelined_print_bliss_sum <- function(InputFilePath, OutputFileName, data_location, combined_file="default_file.csv") {
   current_file <- NULL
   bliss_scores <- import_plate_range(InputFilePath, data_location)
   bliss_sum <- calculate_bliss_sum(bliss_scores)
+  if(file.exists(combined_file)){ ## requires that we overwrite our "final_file_name" for each addition
+    current_file = read.csv(combined_file, header = TRUE, na.strings = c("",0,"<NA>","NA"), row.names = 1)
+  } else { ## this is for processing the first data frame/heatmap column
+    current_file = data.frame(row.names = c("Bliss_Score_Sum"))
+  }
+  current_file$default <- bliss_sum
+  names(current_file)[ncol(current_file)]<-OutputFileName
+  write.csv(current_file, file = combined_file)
+}
+
+pipelined_print_bliss_sum_v2 <- function(InputFilePath, OutputFileName, data_location, combined_file="default_file.csv") {
+  current_file <- NULL
+  bliss_scores <- import_plate_range(InputFilePath, data_location)
+  bliss_sum <- calculate_bliss_sum_v2(bliss_scores)
   if(file.exists(combined_file)){ ## requires that we overwrite our "final_file_name" for each addition
     current_file = read.csv(combined_file, header = TRUE, na.strings = c("",0,"<NA>","NA"), row.names = 1)
   } else { ## this is for processing the first data frame/heatmap column
