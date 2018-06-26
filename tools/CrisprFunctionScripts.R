@@ -143,7 +143,6 @@ merge_frames_by_rowname <- function(frame_one, frame_two) {
   frame_two$both_genes <- rownames(frame_two) ## need to add a column to merge by
   
   intermediate_df <- merge(common_frame, frame_one, by = "both_genes", all.x = TRUE) 
-  
   final_frame <- merge(intermediate_df, frame_two, by = "both_genes", all.x = TRUE)
   
   rownames(final_frame) <- final_frame$both_genes
