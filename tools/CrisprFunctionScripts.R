@@ -18,6 +18,11 @@ if (!require("gplots")) {
   library(gplots)
 }
 
+if (!require("gtools")) {
+  install.packages("gtools", dependencies = TRUE)
+  library(gtools)
+}
+
 
 ## This function combines most of the upfront data management and analysis. It pulls a csv from input folder,
 ## and creates a data frame of the two columns specified.
@@ -34,8 +39,7 @@ build_mean_chart <- function(filename = "default.csv", column_one_name = "DMSO.W
                                         enrich.col = "enrich_treated_untreated")
   raw_data_frame <- outlier_remove(input_dat = raw_data_frame, col_name = "stdev", threshold = 3)
   raw_data_frame <- rank_values(input_data = raw_data_frame, column_to_rank = "mean")
-  raw_data_frame <- bin_placement(input_dat = raw_data_frame, first_threshold_perc = 0.1, 
-                                  rank_col = "cum_rank", second_threshold_perc = 0.25)
+  raw_data_frame <- bin_placement(input_dat = raw_data_frame, rank_col = "cum_rank")
 }
 
 print_mean_chart <- function(filename = "default.csv", output_name = "mean.csv", column_one_name = "DMSO.Week.2", column_two_name = "LY3.Week.2") {
@@ -118,6 +122,8 @@ build_combined_file_from_folder <- function(column_to_isolate = "mean", output_n
 }
 
 build_combined_and_print_heatmap_from_folder <- function(column_to_isolate = "mean", output_name = "combined", threshold = 5, min_columns_to_parse = 4, xaxis_title = "X-axis", yaxis_title = "Y-axis" ) {
+  #column_to_isolate =  "assignment_vect"
+  #output_name = "combined"
   df <- build_combined_file_from_folder(column_to_isolate, output_name)
   print_heatmap(df, output_name = paste(output_name,".jpg",sep = ""), xaxis_title, yaxis_title)
   if(ncol(df) >= min_columns_to_parse) {
@@ -130,7 +136,7 @@ build_combined_and_print_heatmap_from_folder <- function(column_to_isolate = "me
 merge_frames_by_rowname <- function(frame_one, frame_two) {
   present_genes <- rownames(frame_one)
   new_genes <- rownames(frame_two)
-  both_genes <- union(present_genes,new_genes)
+  both_genes <- intersect(present_genes,new_genes)
   common_frame <- data.frame(both_genes) ## data frame that will the basis for merging
   rownames(common_frame) <- common_frame$both_genes
   frame_one$both_genes <- rownames(frame_one) ## need to add a column to merge by
@@ -357,27 +363,21 @@ rank_values <- function(input_data, column_to_rank = "Mean") {
 }
 
 ## creates a new data frame with an additional "assignment_vect" column
-bin_placement <- function(input_dat, first_threshold_perc, second_threshold_perc, rank_col){
+bin_placement <- function(input_dat, bin_number = 30, rank_col){
   temp_dat <- input_dat
   length_dat <- nrow(temp_dat)
+  bin_size = floor(length_dat / bin_number)
+  half_size = bin_number/2
+  quarter_size = half_size/2
   assignment_vect <- c()
   for(i in 1:nrow(temp_dat)){
-    if((temp_dat[i,rank_col] / length_dat) < first_threshold_perc){
-      assignment_vect[i] <- -2 ## these are the BEST sensitizers, lowest LY3/DMSO ratio, most lost upon treatment
-      next
-    } else if((temp_dat[i,rank_col] / length_dat) < second_threshold_perc){
-      assignment_vect[i] <- -1
-      next
-    } else if((temp_dat[i,rank_col] / length_dat) > (1 - first_threshold_perc)){
-      assignment_vect[i] <- 2
-      next
-    } else if((temp_dat[i, rank_col] / length_dat) > (1 - second_threshold_perc)){
-      assignment_vect[i] <- 1
-      next
-    } else {
-      assignment_vect[i] <- 0
-      next
-    }
+      cum_rank = temp_dat[i,rank_col]
+      bin = floor(cum_rank/bin_size)
+      bin = bin - floor(half_size)
+      bin = bin/quarter_size
+      assignment_vect[i] <- bin
+
+    
   }
   temp_dat <- cbind(temp_dat,assignment_vect)
   return(temp_dat)
