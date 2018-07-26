@@ -18,8 +18,11 @@ if (!require("readxl")) {
   library(readxl)
 }
 
+library(tools)
+
 read_xlsx <- readxl::read_xlsx
 heatmap.2 <- gplots::heatmap.2
+file_ext <- tools::file_ext
 
 un_craig_plate <- function(Plate) {
   rownames(Plate) = rev(as.vector(rownames(Plate)))
@@ -223,19 +226,53 @@ print_growth_curves_error <- function(growth_effect_matrix, error_matrix,jpeg_na
 }
 
 import_plate <- function(FileName) {
-  df <- as.data.frame(read_xlsx(FileName, col_names = TRUE))
-  rows <- as.vector(df[,1])
-  df[,1] <- NULL
-  rownames(df) <- rows
-  return(as.matrix(df))
+  ext = file_ext(FileName)
+  if (ext == "xlsx"){
+    df <- as.data.frame(read_xlsx(FileName, col_names = TRUE))
+    rows <- as.vector(df[,1])
+    df[,1] <- NULL
+    rownames(df) <- rows
+    return(as.matrix(df))
+  } else if (ext == "csv"){
+    #range only supported in xlsx files
+    df <- read.csv2(FileName, sep = ',', check.names = FALSE)
+    rows <- as.vector(df[,1])
+    cols <- colnames(df[,2:ncol(df)])
+    df[,1] <- NULL
+    rownames(df) <- rows
+    matrix <- as.matrix(df)
+    matrix <- mapply(matrix, FUN=as.numeric)
+    matrix <- matrix(matrix, ncol = ncol(df), nrow = nrow(df))
+    colnames(matrix) = cols
+    rownames(matrix) = rows
+    return(matrix)
+  } 
+  return(NULL)
 }
 
 import_plate_range <- function(FileName, ImportRange) {
-  df <- as.data.frame(read_xlsx(FileName, col_names = TRUE, range = ImportRange))
-  rows <- as.vector(df[,1])
-  df[,1] <- NULL
-  rownames(df) <- rows
-  return(as.matrix(df))
+  ext = file_ext(FileName)
+  if (ext == "xlsx"){
+    df <- as.data.frame(read_xlsx(FileName, col_names = TRUE, range = ImportRange))
+    rows <- as.vector(df[,1])
+    df[,1] <- NULL
+    rownames(df) <- rows
+    return(as.matrix(df))
+  } else if (ext == "csv"){
+    #range only supported in xlsx files
+    df <- read.csv2(FileName, sep = ',', check.names = FALSE)
+    rows <- as.vector(df[,1])
+    cols <- colnames(df[,2:ncol(df)])
+    df[,1] <- NULL
+    rownames(df) <- rows
+    matrix <- as.matrix(df)
+    matrix <- mapply(matrix, FUN=as.numeric)
+    matrix <- matrix(matrix, ncol = ncol(df), nrow = nrow(df))
+    colnames(matrix) = cols
+    rownames(matrix) = rows
+    return(matrix)
+  } 
+  return(NULL)
 }
 
 
