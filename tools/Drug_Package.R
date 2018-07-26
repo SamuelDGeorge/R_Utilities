@@ -113,7 +113,7 @@ kill_effect_matrix <- function(PlateOne,PlateTwo,Blank,CraigFactor){
   return(Kill_effect)
 }
 
-kill_effect_matrix <- function(growth_effect_matrix, CraigFactor){
+kill_effect_matrix <- function(growth_effect_matrix, CraigFactor = FALSE){
   fold_over = growth_effect_matrix
   if (CraigFactor == TRUE) {
     fold_over = un_craig_plate(growth_effect_matrix)
