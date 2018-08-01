@@ -1,6 +1,39 @@
+if (!require("XML")) {
+  install.packages("XML", dependencies = TRUE)
+  libarary(XML)
+}
+
+if (!require("DESeq2")) {
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("DESeq2")
+  library(DESeq2)
+}
+
+if (!require("tximport")) {
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("tximport")
+  library(tximport)
+}
+
+if (!require("readr")) {
+  install.packages("readr", dependencies = TRUE)
+  library(readr)
+}
+
+if (!require("tximportData")) {
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("tximportData")
+  library(tximportData)
+}
+
 if (!require("stringr")) {
   install.packages("stringr", dependencies = TRUE)
   library(stringr)
+}
+
+if (!require("stringi")) {
+  install.packages("stringi", dependencies = TRUE)
+  library(stringi)
 }
 
 if (!require("tidyr")) {
@@ -58,4 +91,28 @@ normalize_to_column <- function(Full_Data, columns_to_select = "Mia", column_to_
     Full_Data[,current_item] <- Data_Subset[,current_item]
   }
   return(Full_Data)
+}
+
+normalize_multiple_column <- function(Data, columns_list = c("Mia"), columns_to_normalize_by_list = c("MiaP_V4")) {
+  for (item in 1:length(columns_list)) {
+    Data <- normalize_to_column(Data, columns_to_select = columns_list[item], column_to_normalize_by = columns_to_normalize_by_list[item])
+  }
+  return(Data)
+}
+
+pipelined_build_count_file <- function(InputFilePath, OutputFileName, total_file_name = "Default.csv") {
+  current_table = read.table(InputFilePath, sep = "\t", row.names = 1)
+  colnames(current_table) <- c(OutputFileName)
+  if(file.exists(total_file_name)){
+    current_file = read.csv(total_file_name, header = TRUE, na.strings = c("","<NA>","NA"), row.names = 1)
+    final_table <- merge(current_file, current_table, by = 0)
+    rownames(final_table) <- final_table[,1]
+    final_table <- final_table[,-1]
+    write.csv(final_table, file = total_file_name)
+    return(final_table)
+  }
+  current_file = current_table
+  write.csv(current_file, file = total_file_name)
+  return(current_file)
+  
 }
