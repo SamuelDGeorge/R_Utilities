@@ -45,6 +45,38 @@ un_craig_plate <- function(Plate) {
   return(fixed_plate)
 }
 
+growth_effect_calculator <- function(raw_growth, column_to_normalize_by = 1, row_to_normalize_by = 1){
+  growth_plate <- raw_growth/raw_growth[row_to_normalize_by,column_to_normalize_by]
+  return(growth_plate)
+}
+
+kill_effect_matrix <- function(PlateOne,PlateTwo,Blank,CraigFactor){
+  fold_over = growth_effect_matrix(PlateOne,PlateTwo,Blank,CraigFactor)
+  Kill_effect = 1-fold_over
+  return(Kill_effect)
+}
+
+kill_effect_matrix <- function(growth_effect_matrix, CraigFactor = FALSE){
+  fold_over = growth_effect_matrix
+  if (CraigFactor == TRUE) {
+    fold_over = un_craig_plate(growth_effect_matrix)
+  }
+  Kill_effect = 1-fold_over
+  return(Kill_effect)
+}
+
+growth_effect_matrix <- function(PlateOne,PlateTwo,Blank,CraigFactor) {
+  if (CraigFactor == TRUE) {
+    PlateOne = un_craig_plate(PlateOne)
+    PlateTwo = un_craig_plate(PlateTwo)
+    Blank = un_craig_plate(Blank)
+  }  
+  data_plate <- (PlateOne+PlateTwo)/2
+  fold_over = data_plate/Blank
+  fold_over = (fold_over/fold_over[1,1])
+  return(fold_over)
+}
+
 bliss_calculator <- function(PlateOne,PlateTwo,Blank,CraigFactor) {
   bliss <- matrix(ncol = ncol(PlateOne) - 1,nrow = nrow(PlateOne) - 1)
   Kill_effect <- kill_effect_matrix(PlateOne,PlateTwo,Blank,CraigFactor)
@@ -105,34 +137,39 @@ bliss_calculator <- function(growth_effect_matrix,CraigFactor = FALSE) {
   colnames(bliss) <- col_names
   
   return(bliss)
-}  
-
-kill_effect_matrix <- function(PlateOne,PlateTwo,Blank,CraigFactor){
-  fold_over = growth_effect_matrix(PlateOne,PlateTwo,Blank,CraigFactor)
-  Kill_effect = 1-fold_over
-  return(Kill_effect)
 }
 
-kill_effect_matrix <- function(growth_effect_matrix, CraigFactor = FALSE){
-  fold_over = growth_effect_matrix
-  if (CraigFactor == TRUE) {
-    fold_over = un_craig_plate(growth_effect_matrix)
+bliss_calculator_celltox <- function(growth_effect_matrix,CraigFactor = FALSE) {
+  bliss <- matrix(ncol = ncol(growth_effect_matrix) - 1,nrow = nrow(growth_effect_matrix) - 1)
+  Kill_effect <- growth_effect_matrix - 1
+  
+  row_index = 1
+  column_index = 1
+  for(i in 2:nrow(Kill_effect)) {
+    for(j in 2:ncol(Kill_effect)) {
+      fr <- Kill_effect[i,1]
+      fb <- Kill_effect[1,j]
+      bliss[row_index,column_index] <- (fr + fb)/Kill_effect[i,j]
+      column_index = column_index + 1
+    }
+    column_index = 1
+    row_index = row_index + 1
+    
   }
-  Kill_effect = 1-fold_over
-  return(Kill_effect)
+  
+  row_names = as.vector(rownames(Kill_effect))
+  col_names = as.vector(colnames(Kill_effect))
+  
+  row_names <- row_names[-1]
+  col_names <- col_names[-1]
+  
+  rownames(bliss) <- row_names
+  colnames(bliss) <- col_names
+  
+  return(bliss)
 }
 
-growth_effect_matrix <- function(PlateOne,PlateTwo,Blank,CraigFactor) {
-  if (CraigFactor == TRUE) {
-    PlateOne = un_craig_plate(PlateOne)
-    PlateTwo = un_craig_plate(PlateTwo)
-    Blank = un_craig_plate(Blank)
-  }  
-  data_plate <- (PlateOne+PlateTwo)/2
-  fold_over = data_plate/Blank
-  fold_over = (fold_over/fold_over[1,1])
-  return(fold_over)
-}
+
 
 plot_growth_curves <- function(PlateOne,PlateTwo,Blank,CraigFactor = FALSE,jpeg_name = "default.jpg") {
   growth_effect = growth_effect_matrix(PlateOne,PlateTwo,Blank,CraigFactor)
@@ -217,6 +254,32 @@ build_parsed_bliss_map <- function(growth_effect_matrix, max_gi50 = 0.95, min_gi
   keep <- data_bliss[row_to_keep, cols_to_keep]
   return(keep)
 }
+
+build_celltox_parsed_bliss_map <- function(growth_effect_matrix, max_gi50 = 0.95, min_gi50 = 0.05){  
+  data_bliss <- bliss_calculator_celltox(growth_effect_matrix)
+  cols_to_keep = c()
+  row_to_keep = c()
+  
+  for (item in 1:ncol(growth_effect_matrix)){
+    curr_item = growth_effect_matrix[1,item]
+    if( curr_item < max_gi50 && curr_item > min_gi50) {
+      cols_to_keep = c(cols_to_keep,item)
+    }
+  }
+  
+  for (item in 1:nrow(growth_effect_matrix)){
+    curr_item = growth_effect_matrix[item, 1]
+    if( curr_item < max_gi50 && curr_item > min_gi50) {
+      row_to_keep = c(row_to_keep,item)
+    }
+  }
+  row_to_keep = row_to_keep - 1
+  cols_to_keep = cols_to_keep - 1
+  
+  keep <- data_bliss[row_to_keep, cols_to_keep]
+  return(keep)
+}
+
 
 print_growth_curves_error <- function(growth_effect_matrix, error_matrix,jpeg_name = "default.jpg", numCurves = 2,CraigFactor = FALSE) {
   df1 <- data.frame(as.numeric(as.vector(colnames(growth_effect_matrix))))
@@ -610,6 +673,83 @@ print_heatmap_bliss_v2 <- function(data_plate,export_name="default_heatmap.jpg",
   
 }
 
+print_heatmap_bliss_parsed_v1 <- function(growth_plate,export_name="default_heatmap.jpg", GI_Max = 0.95, GI_Min = 0.05, xlabel="x-Axis",ylabel="y-Axis") {
+  data_plate <- build_parsed_bliss_map(growth_plate, max_gi50 = GI_Max, min_gi50 = GI_Min)
+  color_range = 399
+  
+  jpeg(filename=export_name,res=600,height = 12,width = 12,units = "in")
+  
+  Synergy <- colorRampPalette(c("red","white","Blue"))(n = color_range)
+  colors_pal = sort(c(seq(-1,-0.001, length=200), seq(0,1,length=200)))
+  
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      if (current_value < 0) {
+        data_plate[i,j] = 0
+      } else if (current_value > 2) {
+        data_plate[i,j] = 1
+      } else {
+        data_plate[i,j] = current_value - 1
+      } 
+    }
+  }
+  
+  heatmap.2(data_plate, dendrogram = "none",
+            Rowv = NA, 
+            Colv = NA, 
+            xlab = xlabel, 
+            ylab = ylabel,
+            col = Synergy,
+            trace='none',
+            density.info = c("none"),
+            keysize = 1,
+            symkey = FALSE,
+            breaks = colors_pal)
+  
+  dev.off()
+  
+}
+
+print_heatmap_bliss_celltox_v1 <- function(growth_plate,export_name="default_heatmap.jpg", xlabel="x-Axis",ylabel="y-Axis") {
+  data_plate <- bliss_calculator_celltox(growth_plate)
+  color_range = 399
+  
+  jpeg(filename=export_name,res=600,height = 12,width = 12,units = "in")
+  
+  Synergy <- colorRampPalette(c("red","white","Blue"))(n = color_range)
+  colors_pal = sort(c(seq(-1,-0.001, length=200), seq(0,1,length=200)))
+  
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      if (current_value < 0) {
+        data_plate[i,j] = 0
+      } else if (current_value > 2) {
+        data_plate[i,j] = 1
+      } else {
+        data_plate[i,j] = current_value - 1
+      } 
+    }
+  }
+  
+  heatmap.2(data_plate, dendrogram = "none",
+            Rowv = NA, 
+            Colv = NA, 
+            xlab = xlabel, 
+            ylab = ylabel,
+            col = Synergy,
+            trace='none',
+            density.info = c("none"),
+            keysize = 1,
+            symkey = FALSE,
+            breaks = colors_pal)
+  
+  dev.off()
+  
+}
+
+
 pipelined_print_heatmap <- function(InputFilePath, OutputFileName) {
   OutputName = paste(OutputFileName, ".jpg",sep = "")
   print_heatmap_bliss(import_plate(InputFilePath), OutputName)
@@ -623,6 +763,23 @@ pipelined_print_heatmap <- function(InputFilePath, OutputFileName, data_location
 pipelined_print_heatmap_v2 <- function(InputFilePath, OutputFileName, data_location) {
   OutputName = paste(OutputFileName, ".jpg",sep = "")
   print_heatmap_bliss_v2(import_plate_range(InputFilePath, data_location), OutputName)
+}
+
+pipelined_print_bliss_growth_v1 <- function(InputFilePath, OutputFileName, data_location) {
+  OutputName = paste(OutputFileName, ".jpg",sep = "")
+  plate <- import_plate_range(InputFilePath, data_location)
+  plate <- bliss_calculator(plate)
+  print_heatmap_bliss_v2(plate, OutputName)
+}
+
+pipelined_bliss_heatmap_parsed_v1 <- function(InputFilePath, OutputFileName, data_location, GI_Max = 0.95, GI_Min = 0.05) {
+  OutputName = paste(OutputFileName, ".jpg",sep = "")
+  print_heatmap_bliss_parsed_v1(import_plate_range(InputFilePath, data_location), OutputName, GI_Max, GI_Min)
+}
+
+pipelined_bliss_heatmap_celltox_v1 <- function(InputFilePath, OutputFileName, data_location) {
+  OutputName = paste(OutputFileName, ".jpg",sep = "")
+  print_heatmap_bliss_celltox_v1(import_plate_range(InputFilePath, data_location), OutputName)
 }
 
 pipelined_print_bliss_sum <- function(InputFilePath, OutputFileName, data_location, combined_file="default_file.csv") {
@@ -702,6 +859,13 @@ pipelined_print_bliss_scores_from_raw_growth <- function(Input_file_name = "defa
   raw_data = (raw_data/raw_data[1,1])
   bliss = bliss_calculator(raw_data)
   write.csv(bliss, file = output_name)
+}
+
+pipelined_uncraig_batch_normalize <- function(InputFilePath, OutputFileName, data_location) {
+  OutputName = paste(OutputFileName, ".jpg",sep = "")
+  plate <- un_craig_plate(import_plate_range(InputFilePath, data_location))
+  plate <- growth_effect_calculator(plate)
+  write.csv(plate, file = paste(OutputFileName,".csv", sep = ""))
 }
 
 Print_reproducibility_DM_Mean <- function(ReplicateA,ReplicateB, xlabel = "ReplicateB", ylabel = "ReplicateA", xymax  = 3, xymin = 0, export_name = "default.jpg", label_point = FALSE) {
