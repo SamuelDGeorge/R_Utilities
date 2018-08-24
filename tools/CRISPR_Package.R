@@ -160,11 +160,9 @@ isolate_column <- function(input_frame, column_to_isolate = "mean", column_to_is
   return(final_frame)
 }
 
-print_heatmap <- function(input_file, output_name = "heatmap.jpg", xaxis_title = "X_Axis", yaxis_title = "Y_Axis") {
-  color_range = 500
+print_heatmap <- function(input_file, output_name = "heatmap.jpg", color_palette = colorRampPalette(c("red","white","Blue"))(n = 500), xaxis_title = "X_Axis", yaxis_title = "Y_Axis") {
   jpeg(filename=output_name,res=600,height = 12,width = 12,units = "in")
-  
-  Synergy <- colorRampPalette(c("red","white","Blue"))(n = color_range)
+  Synergy <- color_palette
   heatmap.2(as.matrix(input_file),
             dendrogram = "column",
             xlab = NA, 
@@ -180,9 +178,9 @@ print_heatmap <- function(input_file, output_name = "heatmap.jpg", xaxis_title =
   
 }
 
-print_parsed_heatmap_from_raw_csv <- function(input_file, sum_to_parse = 5, output_name_start = "heatmap_parsed", xaxis_title = "X_Axis", yaxis_title = "Y_Axis") {
+print_parsed_heatmap_from_raw_csv <- function(input_file, sum_to_parse = 5, output_name_start = "heatmap_parsed", color_palette_set = colorRampPalette(c("red","white","Blue"))(n = 500), xaxis_title = "X_Axis", yaxis_title = "Y_Axis") {
   raw_map_present <- parse_heatmap(input_file, sum_to_parse)
-  print_heatmap(raw_map_present,output_name = paste(output_name_start,".jpg", sep = ""),xaxis_title,yaxis_title)
+  print_heatmap(raw_map_present,output_name = paste(output_name_start,".jpg", sep = ""), color_palette = color_palette_set,xaxis_title,yaxis_title)
   write.csv(raw_map_present, file = paste(output_name_start,".csv", sep = ""))
   
 }
@@ -419,6 +417,35 @@ Print_reproducibility_DM_Mean <- function(ReplicateA,ReplicateB, xlabel = "Repli
       text(final_frame[,2], YLabelValue, labels = final_frame$Gene , cex = .7)
     }
     
+  }
+  abline(0,1)
+  
+  dev.off()
+}
+
+Print_reproducibility <- function(ReplicateA,ReplicateB, xlabel = "ReplicateA", ylabel = "ReplicateB", comparison_column_name = "mean", label_offset = 0.01, xymax  = 3, xymin = 0, export_name = "default.jpg", label_point = FALSE) {
+  ReplicateA <- as.data.frame(read.csv(ReplicateA, header = T, row.names = 1))
+  ReplicateB <- as.data.frame(read.csv(ReplicateB, header = T, row.names = 1))
+  
+  ReplicateA_mean <- data.frame(rownames(ReplicateA),ReplicateA[,comparison_column_name])
+  colnames(ReplicateA_mean) <- c("Gene",comparison_column_name)
+  ReplicateB_mean <- data.frame(rownames(ReplicateB),ReplicateB[,comparison_column_name])
+  colnames(ReplicateB_mean) <- c("Gene",comparison_column_name)
+  
+  Gene = union(rownames(ReplicateA), rownames(ReplicateB))
+  
+  common_frame = data.frame(Gene)
+  
+  intermediate_df <- merge(common_frame, ReplicateA_mean, by = "Gene", all.x = TRUE) 
+  
+  final_frame <- merge(intermediate_df, ReplicateB_mean, by = "Gene", all.x = TRUE)
+  
+  jpeg(filename=export_name,res=600,height = 12,width = 12,units = "in")
+  
+  plot(final_frame[,2], final_frame[,3], xlab = xlabel, ylab = ylabel, xlim = c(xymin,xymax), ylim = c(xymin,xymax))
+  if (label_point) {
+      YLabelValue = final_frame[,3] + label_offset
+      text(final_frame[,2], YLabelValue, labels = final_frame$Gene, cex = .7)  
   }
   abline(0,1)
   
