@@ -635,6 +635,22 @@ print_heatmap_crispr <- function(data_plate,export_name="default_heatmap.jpg",xl
   
 }
 
+parse_bliss_plate <- function(data_plate) {
+  for (i in 1:nrow(data_plate)) {
+    for(j in 1:ncol(data_plate)) {
+      current_value <- data_plate[i,j]
+      if (current_value < 0) {
+        data_plate[i,j] = 0
+      } else if (current_value > 2) {
+        data_plate[i,j] = 1
+      } else {
+        data_plate[i,j] = current_value - 1
+      } 
+    }
+  }
+  return(data_plate)
+}
+
 print_heatmap_bliss_v2 <- function(data_plate,export_name="default_heatmap.jpg",xlabel="x-Axis",ylabel="y-Axis") {
   
   color_range = 399
